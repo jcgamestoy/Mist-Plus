@@ -101,7 +101,7 @@ timing timing_mono (
 // instance of video timing module for pal@56Hz, 32kHz
 wire [9:0] vcnt_pal56, hcnt_pal56;
 wire hs_pal56, vs_pal56, hmax_pal56, vmax_pal56, bd_pal56;
-timing #(10'd120, 10'd40, 10'd200, 10'd100, 10'd3, 10'd66) timing_pal56 (
+timing #(10'd120, 10'd40, 10'd200, 10'd100, 10'd3, 10'd66,10'd40,10'd40) timing_pal56 (
 		.clk 		(clk			),
 		.reset 	(reset		),
 		.border 	(bd_pal56	),
@@ -116,7 +116,8 @@ timing #(10'd120, 10'd40, 10'd200, 10'd100, 10'd3, 10'd66) timing_pal56 (
 // instance of video timing module for pal@50Hz, 32kHz
 wire [9:0] vcnt_pal50, hcnt_pal50;
 wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50;
-timing #(10'd128, 10'd40, 10'd192, 10'd117, 10'd3, 10'd117) timing_pal50 (
+//timing #(10'd128, 10'd40, 10'd192, 10'd117, 10'd3, 10'd117) timing_pal50 (
+timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88) timing_pal50 (
  		.clk 		(clk			),
 		.reset 	(reset		),
 		.border 	(bd_pal50	),
@@ -131,7 +132,7 @@ timing #(10'd128, 10'd40, 10'd192, 10'd117, 10'd3, 10'd117) timing_pal50 (
 // instance of video timing module for ntsc@60Hz, 32kHz
 wire [9:0] vcnt_ntsc, hcnt_ntsc;
 wire hs_ntsc, vs_ntsc, hmax_ntsc, vmax_ntsc, bd_ntsc;
-timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64) timing_ntsc (
+timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40) timing_ntsc (
 		.clk 		(clk			),
 		.reset 	(reset		),
 		.border 	(bd_ntsc		),
@@ -310,8 +311,8 @@ wire [2:0] stvid_b = mono?mono_rgb:color_b;
 
 // ... add OSD overlay and feed into VGA outputs
 always @(posedge clk) begin
-   video_r <= !osd_oe?{stvid_r,stvid_r}:{osd_pixel, osd_pixel, osd_pixel, stvid_r};
-   video_g <= !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel,      1'b1, stvid_g};
+   video_r <= !osd_oe?{stvid_r,stvid_r}:{osd_pixel, 1'd1, 1'd1, stvid_r};
+   video_g <= !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel, osd_pixel, stvid_g};
    video_b <= !osd_oe?{stvid_b,stvid_b}:{osd_pixel, osd_pixel, osd_pixel, stvid_b};
 end
 
@@ -566,14 +567,15 @@ assign vs = (vcnt >= (V_ACT+V_FP)) && (vcnt < (V_ACT+V_FP+V_S));
 assign hmax = (hcnt == H_ACT + H_FP + H_PRE);
 assign vmax = (vcnt == V_ACT + V_FP);
 
-localparam H_BORDER = 10'd40;
-localparam V_BORDER = 10'd40;
+parameter H_BORDER = 10'd40;
+parameter V_BORDER = 10'd40;
 
 // the following only works if H_BORDER > H_PRE
 wire rborder = (hcnt < H_ACT+H_PRE+H_BORDER)  && ((vcnt < V_ACT+V_BORDER)   || (vcnt >= V_TOT-V_BORDER));
 wire lborder = (hcnt >= H_TOT-H_BORDER+H_PRE) && ((vcnt < V_ACT+V_BORDER-1) || (vcnt >= V_TOT-V_BORDER-1));
 
 assign border = lborder || rborder;
+//assign border = 1'd1;
 
 always @(posedge clk) begin
 	// ------------ video counters --------------
