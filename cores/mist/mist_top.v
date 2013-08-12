@@ -182,6 +182,7 @@ wire init = ~pll_locked;
 video video (
 	.reset      (init          ), // reset input
 	.clk        (clk_32        ),
+  .clk27 (CLOCK_27[0]),
 	.bus_cycle  (bus_cycle     ),
 
 	// spi for OSD

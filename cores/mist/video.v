@@ -22,13 +22,14 @@
 module video (
 	// system interface
 	input         	clk,     // 31.875 MHz
+	input clk27,
 	input         	reset,   // reset
 	input [3:0]   	bus_cycle,
 
 	// SPI interface for OSD
 	input      		sck,
-   input      		ss,
-   input      		sdi,
+  input      		ss,
+  input      		sdi,
 
 	// memory interface
 	output reg [22:0] vaddr,   // video word address counter
@@ -86,23 +87,26 @@ reg [15:0] dataR;
 
 // instance of video timing module for monochrome (72hz)
 wire [9:0] vcnt_mono, hcnt_mono;
-wire hs_mono, vs_mono, hmax_mono, vmax_mono;
+wire hs_mono, vs_mono, hmax_mono, vmax_mono,pixel_mono;
 timing timing_mono (
 		.clk 		(clk			),
+		.video_clk (clk),
 		.reset 	(reset		),
 		.vcnt 	(vcnt_mono	),
 		.hcnt 	(hcnt_mono	),
 		.vs 		(vs_mono		),
 		.hs 		(hs_mono		),
 		.vmax 	(vmax_mono	),
-		.hmax 	(hmax_mono	)
+		.hmax 	(hmax_mono	),
+		.pixel (pixel_mono)
 );
 
 // instance of video timing module for pal@56Hz, 32kHz
 wire [9:0] vcnt_pal56, hcnt_pal56;
-wire hs_pal56, vs_pal56, hmax_pal56, vmax_pal56, bd_pal56;
-timing #(10'd120, 10'd40, 10'd200, 10'd100, 10'd3, 10'd66,10'd40,10'd40) timing_pal56 (
+wire hs_pal56, vs_pal56, hmax_pal56, vmax_pal56, bd_pal56,pixel_pal56;
+timing #(10'd120, 10'd40, 10'd200, 10'd100, 10'd3, 10'd66,10'd40,10'd40,10'd03) timing_pal56 (
 		.clk 		(clk			),
+		.video_clk (clk),
 		.reset 	(reset		),
 		.border 	(bd_pal56	),
 		.vcnt 	(vcnt_pal56	),
@@ -110,15 +114,17 @@ timing #(10'd120, 10'd40, 10'd200, 10'd100, 10'd3, 10'd66,10'd40,10'd40) timing_
 		.vs 		(vs_pal56	),
 		.hs 		(hs_pal56	),
 		.vmax 	(vmax_pal56	),
-		.hmax 	(hmax_pal56	)
+		.hmax 	(hmax_pal56	),
+		.pixel (pixel_pal56)
 );
 
 // instance of video timing module for pal@50Hz, 32kHz
 wire [9:0] vcnt_pal50, hcnt_pal50;
-wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50;
+wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50,pixel_pal50;
 //timing #(10'd128, 10'd40, 10'd192, 10'd117, 10'd3, 10'd117) timing_pal50 (
-timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88) timing_pal50 (
+timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88,10'd03) timing_pal50 (
  		.clk 		(clk			),
+ 		.video_clk (clk),
 		.reset 	(reset		),
 		.border 	(bd_pal50	),
 		.vcnt 	(vcnt_pal50	),
@@ -126,14 +132,16 @@ timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88) timi
 		.vs 		(vs_pal50	),
 		.hs 		(hs_pal50	),
 		.vmax 	(vmax_pal50	),
-		.hmax 	(hmax_pal50	)
+		.hmax 	(hmax_pal50	),
+		.pixel (pixel_pal50)
 );
 
 // instance of video timing module for ntsc@60Hz, 32kHz
 wire [9:0] vcnt_ntsc, hcnt_ntsc;
-wire hs_ntsc, vs_ntsc, hmax_ntsc, vmax_ntsc, bd_ntsc;
-timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40) timing_ntsc (
+wire hs_ntsc, vs_ntsc, hmax_ntsc, vmax_ntsc, bd_ntsc,pixel_ntsc;
+timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40,10'd03) timing_ntsc (
 		.clk 		(clk			),
+		.video_clk (clk),
 		.reset 	(reset		),
 		.border 	(bd_ntsc		),
 		.vcnt 	(vcnt_ntsc	),
@@ -141,7 +149,8 @@ timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40) timing_n
 		.vs 		(vs_ntsc		),
 		.hs 		(hs_ntsc		),
 		.vmax 	(vmax_ntsc	),
-		.hmax 	(hmax_ntsc	)
+		.hmax 	(hmax_ntsc	),
+		.pixel (pixel_ntsc)
 );
 
 // ----------- de-multiplex video timing signals ------------
@@ -154,6 +163,7 @@ wire hs_pal = pal56?hs_pal56:hs_pal50;
 wire vs_pal = pal56?vs_pal56:vs_pal50;
 wire hmax_pal = pal56?hmax_pal56:hmax_pal50;
 wire vmax_pal = pal56?vmax_pal56:vmax_pal50;
+wire pixel_pal=pal56?pixel_pal56:pixel_pal50;
 
 // de-multiplex pal(50hz/56hz)/ntsc(60hz) timing
 wire [9:0] hcnt_color = pal?hcnt_pal:hcnt_ntsc;
@@ -163,6 +173,7 @@ wire hs_color = pal?hs_pal:hs_ntsc;
 wire vs_color = pal?vs_pal:vs_ntsc;
 wire hmax_color = pal?hmax_pal:hmax_ntsc;
 wire vmax_color = pal?vmax_pal:vmax_ntsc;
+wire pixel_color=pal?pixel_pal:pixel_ntsc;
 
 // de-multiplex mono(72hz)/color(50hz/56hz/60hz) timing
 wire [9:0] hcnt = mono?hcnt_mono:hcnt_color;
@@ -173,10 +184,12 @@ wire bd = mono?1'b0:bd_color;
 wire hmax = mono?hmax_mono:hmax_color;
 wire vmax = mono?vmax_mono:vmax_color;
 
-always @(posedge clk) begin
-   hs <= mono?~hs_mono:hs_color;
-   vs <= mono?~vs_mono:vs_color;
-end
+wire pixel_clk=clk;
+wire pixelx=mono?pixel_mono:pixel_color;
+
+reg [9:0] rc,wc;
+
+
 
 reg [15:0] tx, tx0, tx1, tx2, tx3;      // output shift registers
 
@@ -300,20 +313,51 @@ wire [2:0] mono_rgb = de?{mono_bit, mono_bit, mono_bit}:3'b000;
 // --------------- colour video signal ------------------
 // border color is taken from palette[0]
 wire [3:0] index16 = { tx3[15], tx2[15], tx1[15], tx0[15] };
-wire [2:0] color_r = de?palette_r[index16]:(bd?palette_r[0]:3'b000);
-wire [2:0] color_g = de?palette_g[index16]:(bd?palette_g[0]:3'b000);
-wire [2:0] color_b = de?palette_b[index16]:(bd?palette_b[0]:3'b000);
+wire [2:0] color_r = de?palette_r[index16]:3'b000;
+wire [2:0] color_g = de?palette_g[index16]:3'b000;
+wire [2:0] color_b = de?palette_b[index16]:3'b000;
 
 // de-multiplex color and mono into one vga signal ...
 wire [2:0] stvid_r = mono?mono_rgb:color_r;
 wire [2:0] stvid_g = mono?mono_rgb:color_g;
 wire [2:0] stvid_b = mono?mono_rgb:color_b;
 
+
+
+reg [17:0] px1[1023:0]; 
+reg [17:0] px2[1023:0]; 
+
 // ... add OSD overlay and feed into VGA outputs
 always @(posedge clk) begin
-   video_r <= !osd_oe?{stvid_r,stvid_r}:{osd_pixel, 1'd1, 1'd1, stvid_r};
-   video_g <= !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel, osd_pixel, stvid_g};
-   video_b <= !osd_oe?{stvid_b,stvid_b}:{osd_pixel, osd_pixel, osd_pixel, stvid_b};
+   // video_r <= !osd_oe?{stvid_r,stvid_r}:{osd_pixel, 1'd1, 1'd1, stvid_r};
+   // video_g <= !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel, osd_pixel, stvid_g};
+   // video_b <= !osd_oe?{stvid_b,stvid_b}:{osd_pixel, osd_pixel, osd_pixel, stvid_b};
+  if(de) begin
+	  if(vcnt[0]) begin
+	    px1[wc]<=!osd_oe?{stvid_r,stvid_r,stvid_g,stvid_g,stvid_b,stvid_b}:{osd_pixel,1'b1,1'b1,stvid_r,osd_pixel,osd_pixel,osd_pixel,stvid_g,osd_pixel,osd_pixel,osd_pixel,stvid_b};
+	  end else begin
+	   	px2[wc]<=!osd_oe?{stvid_r,stvid_r,stvid_g,stvid_g,stvid_b,stvid_b}:{osd_pixel,1'b1,1'b1,stvid_r,osd_pixel,osd_pixel,osd_pixel,stvid_g,osd_pixel,osd_pixel,osd_pixel,stvid_b};
+	  end
+  end
+
+  wc<=de?wc+10'd1:10'd0;
+end
+
+always @(posedge pixel_clk) begin
+	if(vcnt[0]) begin
+		video_r<=pixel?px2[rc][17:12]:(bd?{palette_r[0],palette_r[0]}:6'b000000);
+		video_g<=pixel?px2[rc][11:6]:(bd?{palette_g[0],palette_g[0]}:6'b000000);
+		video_b<=pixel?px2[rc][5:0]:(bd?{palette_b[0],palette_b[0]}:6'b000000);
+	end else begin
+		video_r<=pixel?px1[rc][17:12]:(bd?{palette_r[0],palette_r[0]}:6'b000000);
+		video_g<=pixel?px1[rc][11:6]:(bd?{palette_g[0],palette_g[0]}:6'b000000);
+		video_b<=pixel?px1[rc][5:0]:(bd?{palette_b[0],palette_b[0]}:6'b000000);
+	end
+
+	hs <= mono?~hs_mono:hs_color;
+  vs <= mono?~vs_mono:vs_color;
+
+  rc<=pixel?rc+10'd1:10'd0;	
 end
 
 wire [9:0] overscan_bottom = overscan_latched?10'd60:10'd0;
@@ -322,10 +366,11 @@ wire [9:0] overscan_bottom = overscan_latched?10'd60:10'd0;
 // the color modes use a scan doubler and output the data with 2 lines delay
 wire [9:0] v_offset = mono?10'd0:10'd2; 
 wire de = (hcnt >= H_PRE) && (hcnt < H_ACT+H_PRE) && (vcnt >= v_offset && vcnt < V_ACT+v_offset+overscan_bottom);
+wire pixel = pixelx && (vcnt >= v_offset+1 && vcnt < V_ACT+v_offset+overscan_bottom+1);
 
 // a fake de signal for timer a for color modes with half the hsync frequency
 wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE-10'd160) && vcnt[0])) && 
-	(vcnt >= (v_offset-10'd0) && vcnt < (V_ACT+v_offset+overscan_bottom-10'd0));
+	(vcnt >= (v_offset) && vcnt < (V_ACT+v_offset+overscan_bottom));
 
 // a fake hsync pulse for the scan doubled color modes
 wire hsC = vcnt[0] && hs; 
@@ -528,6 +573,7 @@ endmodule
 // generic video timing generator
 module timing (
 	input         	clk,     // 31.875 MHz pixel clock
+	input video_clk,
 	input         	reset,
 
 	output border,              // border (incl active area)
@@ -539,7 +585,10 @@ module timing (
 	output hs,              // horizontal sync signal
 	
 	output vmax,            // max vertical pixel position reached
-	output hmax             // max horizontal pixel position reached
+	output hmax,             // max horizontal pixel position reached
+
+	output pixel_clk,
+	output pixel
 );
 
 localparam H_PRE = 10'd16;
@@ -559,8 +608,8 @@ parameter V_BP  = 10'd73;
 localparam V_TOT = V_ACT + V_FP + V_S + V_BP;
 
 // generate sync pulses
-assign hs = (hcnt >= (H_ACT+H_FP+H_PRE)) && (hcnt < (H_ACT+H_FP+H_S+H_PRE));
-assign vs = (vcnt >= (V_ACT+V_FP)) && (vcnt < (V_ACT+V_FP+V_S));
+assign hs = (hcnt >= (H_ACT+H_FP)) && (hcnt < (H_ACT+H_FP+H_S));
+assign vs = (vcnt >= (V_ACT+V_FP+V_OFFSET)) && (vcnt < (V_ACT+V_FP+V_S+V_OFFSET));
 
 // max is not really the max possible position but something "far" behind the
 // visible area to allow for counter resets etc
@@ -570,12 +619,17 @@ assign vmax = (vcnt == V_ACT + V_FP);
 parameter H_BORDER = 10'd40;
 parameter V_BORDER = 10'd40;
 
+parameter V_OFFSET = 10'd1;
+
 // the following only works if H_BORDER > H_PRE
-wire rborder = (hcnt < H_ACT+H_PRE+H_BORDER)  && ((vcnt < V_ACT+V_BORDER)   || (vcnt >= V_TOT-V_BORDER));
-wire lborder = (hcnt >= H_TOT-H_BORDER+H_PRE) && ((vcnt < V_ACT+V_BORDER-1) || (vcnt >= V_TOT-V_BORDER-1));
+wire rborder = (hcnt < H_ACT+H_BORDER)  && ((vcnt < V_ACT+V_BORDER+V_OFFSET)   || (vcnt >= V_TOT-V_BORDER+V_OFFSET));
+wire lborder = (hcnt >= H_TOT-H_BORDER) && ((vcnt < V_ACT+V_BORDER+V_OFFSET-1) || (vcnt >= V_TOT-V_BORDER+V_OFFSET-1));
 
 assign border = lborder || rborder;
 //assign border = 1'd1;
+
+assign pixel_clk=video_clk;
+assign pixel=(hcnt>=0 && hcnt<H_ACT);// && (vcnt>=V_OFFSET && vcnt<V_ACT+V_OFFSET) ;
 
 always @(posedge clk) begin
 	// ------------ video counters --------------
@@ -599,6 +653,5 @@ always @(posedge clk) begin
 		end
 	end
 end
-
 
 endmodule
