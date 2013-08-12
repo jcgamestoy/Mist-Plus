@@ -98,7 +98,8 @@ timing timing_mono (
 		.hs 		(hs_mono		),
 		.vmax 	(vmax_mono	),
 		.hmax 	(hmax_mono	),
-		.pixel (pixel_mono)
+		.pixel (pixel_mono),
+		.pixel_clk (pixel_clk_mono)
 );
 
 // instance of video timing module for pal@56Hz, 32kHz
@@ -115,16 +116,18 @@ timing #(10'd120, 10'd40, 10'd200, 10'd100, 10'd3, 10'd66,10'd40,10'd40,10'd03) 
 		.hs 		(hs_pal56	),
 		.vmax 	(vmax_pal56	),
 		.hmax 	(hmax_pal56	),
-		.pixel (pixel_pal56)
+		.pixel (pixel_pal56),
+		.pixel_clk (pixel_clk_pal56)
 );
 
 // instance of video timing module for pal@50Hz, 32kHz
 wire [9:0] vcnt_pal50, hcnt_pal50;
 wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50,pixel_pal50;
 //timing #(10'd128, 10'd40, 10'd192, 10'd117, 10'd3, 10'd117) timing_pal50 (
-timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88,10'd03) timing_pal50 (
+//timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88,10'd03) timing_pal50 (
+timing #(10'd52,10'd63,10'd109,10'd93,10'd5,10'd127,10'd40,10'd88,10'd03) timing_pal50 (
  		.clk 		(clk			),
- 		.video_clk (clk),
+ 		.video_clk (clk27),
 		.reset 	(reset		),
 		.border 	(bd_pal50	),
 		.vcnt 	(vcnt_pal50	),
@@ -133,7 +136,8 @@ timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88,10'd0
 		.hs 		(hs_pal50	),
 		.vmax 	(vmax_pal50	),
 		.hmax 	(hmax_pal50	),
-		.pixel (pixel_pal50)
+		.pixel (pixel_pal50),
+		.pixel_clk (pixel_clk_pal50)
 );
 
 // instance of video timing module for ntsc@60Hz, 32kHz
@@ -150,7 +154,8 @@ timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40,10'd03) t
 		.hs 		(hs_ntsc		),
 		.vmax 	(vmax_ntsc	),
 		.hmax 	(hmax_ntsc	),
-		.pixel (pixel_ntsc)
+		.pixel (pixel_ntsc),
+		.pixel_clk (pixel_clk_ntsc)
 );
 
 // ----------- de-multiplex video timing signals ------------
@@ -164,6 +169,7 @@ wire vs_pal = pal56?vs_pal56:vs_pal50;
 wire hmax_pal = pal56?hmax_pal56:hmax_pal50;
 wire vmax_pal = pal56?vmax_pal56:vmax_pal50;
 wire pixel_pal=pal56?pixel_pal56:pixel_pal50;
+wire pixel_clk_pal=pal56?pixel_clk_pal56:pixel_clk_pal50;
 
 // de-multiplex pal(50hz/56hz)/ntsc(60hz) timing
 wire [9:0] hcnt_color = pal?hcnt_pal:hcnt_ntsc;
@@ -174,6 +180,7 @@ wire vs_color = pal?vs_pal:vs_ntsc;
 wire hmax_color = pal?hmax_pal:hmax_ntsc;
 wire vmax_color = pal?vmax_pal:vmax_ntsc;
 wire pixel_color=pal?pixel_pal:pixel_ntsc;
+wire pixel_clk_color=pal?pixel_clk_pal:pixel_clk_ntsc;
 
 // de-multiplex mono(72hz)/color(50hz/56hz/60hz) timing
 wire [9:0] hcnt = mono?hcnt_mono:hcnt_color;
@@ -184,7 +191,7 @@ wire bd = mono?1'b0:bd_color;
 wire hmax = mono?hmax_mono:hmax_color;
 wire vmax = mono?vmax_mono:vmax_color;
 
-wire pixel_clk=clk;
+wire pixel_clk=mono?pixel_clk_mono:pixel_clk_color;
 wire pixelx=mono?pixel_mono:pixel_color;
 
 reg [9:0] rc,wc;
@@ -608,7 +615,7 @@ parameter V_BP  = 10'd73;
 localparam V_TOT = V_ACT + V_FP + V_S + V_BP;
 
 // generate sync pulses
-assign hs = (hcnt >= (H_ACT+H_FP)) && (hcnt < (H_ACT+H_FP+H_S));
+assign hs = (pxc >= (H_ACT+H_FP)) && (pxc < (H_ACT+H_FP+H_S));
 assign vs = (vcnt >= (V_ACT+V_FP+V_OFFSET)) && (vcnt < (V_ACT+V_FP+V_S+V_OFFSET));
 
 // max is not really the max possible position but something "far" behind the
@@ -622,28 +629,30 @@ parameter V_BORDER = 10'd40;
 parameter V_OFFSET = 10'd1;
 
 // the following only works if H_BORDER > H_PRE
-wire rborder = (hcnt < H_ACT+H_BORDER)  && ((vcnt < V_ACT+V_BORDER+V_OFFSET)   || (vcnt >= V_TOT-V_BORDER+V_OFFSET));
-wire lborder = (hcnt >= H_TOT-H_BORDER) && ((vcnt < V_ACT+V_BORDER+V_OFFSET-1) || (vcnt >= V_TOT-V_BORDER+V_OFFSET-1));
+wire rborder = (pxc < H_ACT+H_BORDER)  && ((vcnt < V_ACT+V_BORDER+V_OFFSET)   || (vcnt >= V_TOT-V_BORDER+V_OFFSET));
+wire lborder = (pxc >= H_TOT-H_BORDER) && ((vcnt < V_ACT+V_BORDER+V_OFFSET-1) || (vcnt >= V_TOT-V_BORDER+V_OFFSET-1));
 
 assign border = lborder || rborder;
 //assign border = 1'd1;
 
 assign pixel_clk=video_clk;
-assign pixel=(hcnt>=0 && hcnt<H_ACT);// && (vcnt>=V_OFFSET && vcnt<V_ACT+V_OFFSET) ;
+assign pixel=(pxc>=0 && pxc<H_ACT);// && (vcnt>=V_OFFSET && vcnt<V_ACT+V_OFFSET) ;
 
-always @(posedge clk) begin
+reg [9:0] pxc;
+
+always @(posedge video_clk) begin
 	// ------------ video counters --------------
 	if(reset) begin
 		// using reset here is important to make sure video counters
 		// run synchronous to bus state machine
-		hcnt <= 10'd0;
+		pxc <= 10'd0;
 		vcnt <= 10'd0;
 	end else begin
 		// horizontal video counter
-		if(hcnt < H_TOT - 10'd1)
-			hcnt <= hcnt + 10'd1;
+		if(pxc < H_TOT - 10'd1)
+			pxc <= pxc + 10'd1;
 		else begin
-			hcnt <= 10'd0;
+			pxc <= 10'd0;
 			// vertical video counter
 			if(vcnt < V_TOT - 10'd1)
 				vcnt <= vcnt + 10'd1;
@@ -651,6 +660,16 @@ always @(posedge clk) begin
 				vcnt <= 10'd0;
 			end
 		end
+	end
+end
+
+wire reseth=(pxc==H_TOT-10'd1);
+
+always @(posedge clk) begin
+	if(reseth || reset) begin
+		hcnt<=10'd0;
+	end else begin
+		hcnt<=hcnt+1;
 	end
 end
 
