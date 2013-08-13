@@ -1,0 +1,9 @@
+*~
+.*
+!.gitignore
+db/*
+incremental_db/*
+out/*
+*.qdf
+*.stp
+*.txt
