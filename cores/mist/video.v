@@ -26,6 +26,9 @@ module video (
 	input         	reset,   // reset
 	input [3:0]   	bus_cycle,
 
+	//Debug signal
+	input [3:0] signal,
+
 	// SPI interface for OSD
 	input      		sck,
   input      		ss,
@@ -91,7 +94,9 @@ wire hs_mono, vs_mono, hmax_mono, vmax_mono,pixel_mono;
 timing timing_mono (
 		.clk 		(clk			),
 		.video_clk (clk),
+		.bus_cycle (bus_cycle),
 		.reset 	(reset		),
+		.signal (signal),
 		.vcnt 	(vcnt_mono	),
 		.hcnt 	(hcnt_mono	),
 		.vs 		(vs_mono		),
@@ -108,7 +113,9 @@ wire hs_pal56, vs_pal56, hmax_pal56, vmax_pal56, bd_pal56,pixel_pal56;
 timing #(10'd120, 10'd40, 10'd200, 10'd100, 10'd3, 10'd66,10'd40,10'd40,10'd03) timing_pal56 (
 		.clk 		(clk			),
 		.video_clk (clk),
+		.bus_cycle (bus_cycle),
 		.reset 	(reset		),
+		.signal (signal),
 		.border 	(bd_pal56	),
 		.vcnt 	(vcnt_pal56	),
 		.hcnt 	(hcnt_pal56	),
@@ -128,7 +135,9 @@ wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50,pixel_pal50;
 timing #(10'd52,10'd63,10'd109,10'd93,10'd5,10'd127,10'd40,10'd88,10'd03) timing_pal50 (
  		.clk 		(clk			),
  		.video_clk (clk27),
+ 		.bus_cycle (bus_cycle),
 		.reset 	(reset		),
+		.signal (signal),
 		.border 	(bd_pal50	),
 		.vcnt 	(vcnt_pal50	),
 		.hcnt 	(hcnt_pal50	),
@@ -143,10 +152,13 @@ timing #(10'd52,10'd63,10'd109,10'd93,10'd5,10'd127,10'd40,10'd88,10'd03) timing
 // instance of video timing module for ntsc@60Hz, 32kHz
 wire [9:0] vcnt_ntsc, hcnt_ntsc;
 wire hs_ntsc, vs_ntsc, hmax_ntsc, vmax_ntsc, bd_ntsc,pixel_ntsc;
-timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40,10'd03) timing_ntsc (
+//timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40,10'd03) timing_ntsc (
+timing #(10'd56, 10'd62, 10'd100, 10'd49, 10'd6, 10'd70,10'd40,10'd40,10'd03) timing_ntsc (
 		.clk 		(clk			),
-		.video_clk (clk),
+		.video_clk (clk27),
+		.bus_cycle (bus_cycle),
 		.reset 	(reset		),
+		.signal (signal),
 		.border 	(bd_ntsc		),
 		.vcnt 	(vcnt_ntsc	),
 		.hcnt 	(hcnt_ntsc	),
@@ -375,9 +387,26 @@ wire [9:0] v_offset = mono?10'd0:10'd2;
 wire de = (hcnt >= H_PRE) && (hcnt < H_ACT+H_PRE) && (vcnt >= v_offset && vcnt < V_ACT+v_offset+overscan_bottom);
 wire pixel = pixelx && (vcnt >= v_offset+1 && vcnt < V_ACT+v_offset+overscan_bottom+1);
 
+reg deFake;
+
+always @(posedge clk) begin
+	if(reset) begin
+		deFake<=1'b0;
+	end else begin
+		if(hcnt==H_PRE && !vcnt[0]) begin
+			deFake<=1'b1;
+		end else begin
+			if(hcnt==H_ACT+H_PRE-10'd161 && vcnt[0]) begin
+				deFake<=1'b0;
+			end
+		end
+	end
+end
+
 // a fake de signal for timer a for color modes with half the hsync frequency
-wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE-10'd160) && vcnt[0])) && 
-	(vcnt >= (v_offset) && vcnt < (V_ACT+v_offset+overscan_bottom));
+//wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE-10'd160) && vcnt[0])) && 
+//	(vcnt >= (v_offset) && vcnt < (V_ACT+v_offset+overscan_bottom));
+wire deC=deFake && (vcnt >= (v_offset) && vcnt < (V_ACT+v_offset+overscan_bottom));
 
 // a fake hsync pulse for the scan doubled color modes
 wire hsC = vcnt[0] && hs; 
@@ -581,7 +610,10 @@ endmodule
 module timing (
 	input         	clk,     // 31.875 MHz pixel clock
 	input video_clk,
+	input [3:0] bus_cycle,
 	input         	reset,
+
+	input [3:0] signal,
 
 	output border,              // border (incl active area)
 
@@ -663,13 +695,17 @@ always @(posedge video_clk) begin
 	end
 end
 
-wire reseth=(pxc==H_TOT-10'd1);
+wire reseth=(pxc>=H_TOT-6 || pxc<6);
 
 always @(posedge clk) begin
-	if(reseth || reset) begin
+	if(reset) begin
 		hcnt<=10'd0;
 	end else begin
-		hcnt<=hcnt+1;
+		if(reseth && bus_cycle==signal) begin
+			hcnt<=10'b0;
+		end else begin
+			hcnt<=hcnt+10'd1;
+		end
 	end
 end
 

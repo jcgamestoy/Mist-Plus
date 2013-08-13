@@ -108,6 +108,9 @@ unsigned char fs_Options;
 unsigned char fs_MenuSelect;
 unsigned char fs_MenuCancel;
 
+//Remove me!!!
+int sig=0;
+
 void SelectFile(char* pFileExt, unsigned char Options, unsigned char MenuSelect, unsigned char MenuCancel)
 {
     // this function displays file selection menu
@@ -553,7 +556,7 @@ void HandleUI(void)
 
 
     case MENU_MIST_VIDEO1 :
-	menumask=0x07;
+	menumask=0x0f;
 	OsdSetTitle("Video", 0);
 
         OsdWrite(0, "", 0,0);
@@ -569,11 +572,12 @@ void HandleUI(void)
 	if(tos_system_ctrl & TOS_CONTROL_VIDEO_COLOR) strcat(s, "Color");
 	else                                          strcat(s, "Mono");
         OsdWrite(3, s, menusub == 1,0);
-	
-        OsdWrite(4, "", 0,0);
+	     
+        sprintf(s," Signal: %x",sig);
+        OsdWrite(4, s, menusub==2,0);
         OsdWrite(5, "", 0,0);
         OsdWrite(6, "", 0,0);
-        OsdWrite(7, STD_EXIT, menusub == 2,0);
+        OsdWrite(7, STD_EXIT, menusub == 3,0);
 
 	parentstate = menustate;
         menustate = MENU_MIST_VIDEO2;
@@ -596,7 +600,12 @@ void HandleUI(void)
 	  menustate = MENU_MIST_VIDEO1;
 	  break;
 
-	case 2:
+  case 2:
+    sig=(sig+1) & 0xf;
+    tos_update_sysctrl((tos_system_ctrl & 0x0ffffff) | (sig<<28));
+    menustate=MENU_MIST_VIDEO1;
+    break;
+	case 3:
 	  menustate = MENU_MIST_MAIN1;
 	  menusub = 4;
 	}

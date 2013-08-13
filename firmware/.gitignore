@@ -1,0 +1,9 @@
+.*
+!.gitignore
+*.o
+*.d
+firmware.*
+!firmware.c
+!firmware.h
+crt.lst
+mkupg
