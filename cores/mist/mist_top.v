@@ -52,7 +52,7 @@ wire [1:0] buttons;
 
 // generate dtack for all implemented peripherals
 wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack || 
-     acia_sel || psg_sel || dma_sel || auto_iack;
+     acia_sel || psg_sel || dma_sel || auto_iack || blitter_sel;
 
 // the original tg68k did not contain working support for bus fault exceptions. While earlier
 // TOS versions cope with that, TOS versions with blitter support need this to work as this is
@@ -114,11 +114,8 @@ end
 		
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
-wire br = dma_br && (tg68_cpustate[1:0] == 2'b00) ;   // dma is only other bus master (yet)
-wire dma_br;
-
-// dma_br may come at any time. Make sure the real br comes not before the end 
-// of the instruction
+wire br = data_io_br; //  && (tg68_cpustate[1:0] == 2'b00) ;   // dma is only other bus master (yet)
+wire data_io_br;
 
 // request interrupt ack from mfp for IPL == 6
 wire mfp_iack = cpu_cycle && cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b110);
@@ -163,6 +160,11 @@ wire [7:0] mfp_data_out;
 wire acia_sel = io_sel && ({tg68_adr[15:8], 8'd0} == 16'hfc00);
 wire [7:0] acia_data_out;
 
+// blitter 16 bit interface at $ff8a00 - $ff8a3f
+// wire blitter_sel = io_sel && ({tg68_adr[15:8], 8'd0} == 16'h8a00);
+wire blitter_sel = 1'b0;
+wire [15:0] blitter_data_out;
+
 //  psg 8 bit interface at $ff8800 - $ff8803
 wire psg_sel  = io_sel && ({tg68_adr[15:8], 8'd0} == 16'h8800);
 wire [7:0] psg_data_out;
@@ -174,7 +176,7 @@ wire [15:0] dma_data_out;
 // de-multiplex the various io data output ports into one 
 wire [7:0] io_data_out_8u = acia_data_out | psg_data_out;
 wire [7:0] io_data_out_8l = mmu_data_out | mfp_data_out | auto_vector;
-wire [15:0] io_data_out = vreg_data_out | dma_data_out |
+wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out |
 			{8'h00, io_data_out_8l} | {io_data_out_8u, 8'h00};
 
 wire init = ~pll_locked;
@@ -280,6 +282,20 @@ acia acia (
 	.ikbd_data_in 	   			(ikbd_data_to_acia)
 );
 
+blitter blitter (
+	// cpu interface
+	.clk      (clk_8            ),
+	.reset    (reset            ),
+	.din      (tg68_dat_out     ),
+	.sel      (blitter_sel      ),
+	.addr     (tg68_adr[5:1]    ),
+	.uds      (tg68_uds         ),
+	.lds      (tg68_uds         ),
+	.rw       (tg68_rw          ),
+	.dout     (blitter_data_out ),
+	.irq      (                 )
+);
+   
 
 //// ym2149 sound chip ////
 reg [1:0] sclk;
@@ -331,7 +347,7 @@ YM2149 ym2149 (
 	.CLK                	( sclk[1]  					)	// 2 MHz
 );
   
-wire dma_dio_ack, dma_dio_nak;
+wire dma_dio_ack;
 wire [4:0] dma_dio_idx;
 wire [7:0] dma_dio_data;
 
@@ -351,7 +367,6 @@ dma dma (
 	.dout     (dma_data_out),
 	
 	.irq      (dma_irq     ),
-	.br       (dma_br      ),
 
 	// system control interface
 	.fdc_wr_prot (wr_prot),
@@ -361,7 +376,6 @@ dma dma (
 	.dio_idx  (dma_dio_idx ),
 	.dio_data (dma_dio_data),
 	.dio_ack  (dma_dio_ack ),
-	.dio_nak  (dma_dio_nak ),
 
 	// floppy interface
 	.drv_sel  (floppy_sel  ),
@@ -715,11 +729,12 @@ data_io data_io (
 		.ss    		(SPI_SS2			),
 		.sdo			(data_io_sdo	),
 
+		.br         (data_io_br    ),
+		
 		// dma status interface
 		.dma_idx    (dma_dio_idx   ),
 		.dma_data   (dma_dio_data  ),
 		.dma_ack    (dma_dio_ack   ),
-		.dma_nak    (dma_dio_nak   ),
 
 		// ram interface
 		.state 	 	(host_state		),
