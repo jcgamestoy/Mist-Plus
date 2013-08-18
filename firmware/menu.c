@@ -100,6 +100,10 @@ const char *helptexts[]={
 	0
 };
 
+
+const char* scanlines[]={"off","25%","50%","75%"};
+unsigned int scan=0;
+
 unsigned char config_autofire = 0;
 
 // file selection menu variables
@@ -107,9 +111,6 @@ char *fs_pFileExt = NULL;
 unsigned char fs_Options;
 unsigned char fs_MenuSelect;
 unsigned char fs_MenuCancel;
-
-//Remove me!!!
-int sig=0;
 
 void SelectFile(char* pFileExt, unsigned char Options, unsigned char MenuSelect, unsigned char MenuCancel)
 {
@@ -577,13 +578,18 @@ void HandleUI(void)
 	strcpy(s, " Screen: ");
 	if(tos_system_ctrl & TOS_CONTROL_VIDEO_COLOR) strcat(s, "Color");
 	else                                          strcat(s, "Mono");
-        OsdWrite(3, s, menusub == 1,0);
+  OsdWrite(3, s, menusub == 1,0);
 	     
-        sprintf(s," Signal: %x",sig);
-        OsdWrite(4, s, menusub==2,0);
-        OsdWrite(5, "", 0,0);
-        OsdWrite(6, "", 0,0);
-        OsdWrite(7, STD_EXIT, menusub == 3,0);
+        // sprintf(s," Signal: %x",sig);
+        // OsdWrite(4, s, menusub==2,0);
+  
+  //sprintf(s," Scanlines: ");
+  strcpy(s," Scanlines: ");
+  strcat(s,scanlines[scan & 0x3]);
+  OsdWrite(4,s,menusub==2,0);
+  OsdWrite(5, "", 0,0);
+  OsdWrite(6, "", 0,0);
+  OsdWrite(7, STD_EXIT, menusub == 3,0);
 
 	parentstate = menustate;
         menustate = MENU_MIST_VIDEO2;
@@ -607,8 +613,8 @@ void HandleUI(void)
 	  break;
 
   case 2:
-    sig=(sig+1) & 0xf;
-    tos_update_sysctrl((tos_system_ctrl & 0x0ffffff) | (sig<<28));
+    scan=(scan+1) & 0x3;
+    tos_update_sysctrl((tos_system_ctrl & 0x8ffffff) | (scan<<30));
     menustate=MENU_MIST_VIDEO1;
     break;
 	case 3:

@@ -26,6 +26,7 @@ module video (
   input           reset,   // reset
   input [3:0]     bus_cycle,
 
+  input [1:0] scanlines,
   // SPI interface for OSD
   input         sck,
   input         ss,
@@ -365,9 +366,31 @@ always @(posedge clk) begin
 end
 
 always @(posedge pixel_clk) begin
-  video_r<=pixel?rPixel[17:12]:6'b000000;
-  video_g<=pixel?rPixel[11:6]:6'b000000;
-  video_b<=pixel?rPixel[5:0]:6'b000000;
+  if(!vcnt[0] || scanlines==2'b00 || mono) begin
+    video_r<=pixel?rPixel[17:12]:6'b000000;
+    video_g<=pixel?rPixel[11:6]:6'b000000;
+    video_b<=pixel?rPixel[5:0]:6'b000000;
+  end else begin
+    case(scanlines)
+      2'b01: begin //25%
+        video_r<=pixel?(({1'b0,rPixel[17:12],1'b0}+{2'b00,rPixel[17:12]})>>2):6'b000000;
+        video_g<=pixel?(({1'b0,rPixel[11:6],1'b0}+{2'b00,rPixel[11:6]})>>2):6'b000000;
+        video_b<=pixel?(({1'b0,rPixel[5:0],1'b0}+{2'b00,rPixel[5:0]})>>2):6'b000000;
+      end
+
+      2'b10: begin //50%
+        video_r<=pixel?{1'b0,rPixel[17:13]}:6'b000000;
+        video_g<=pixel?{1'b0,rPixel[11:7]}:6'b000000;
+        video_b<=pixel?{1'b0,rPixel[5:1]}:6'b000000;
+      end
+
+      2'b11: begin //75%
+        video_r<=pixel?{2'b00,rPixel[17:14]}:6'b000000;
+        video_g<=pixel?{2'b00,rPixel[11:8]}:6'b000000;
+        video_b<=pixel?{2'b00,rPixel[5:2]}:6'b000000;
+      end
+    endcase
+  end
   
   hs <= mono?~hs_mono:((pal && pal56)?hs_color:~hs_color);
   vs <= mono?~vs_mono:((pal && pal56)?vs_color:~vs_color);
