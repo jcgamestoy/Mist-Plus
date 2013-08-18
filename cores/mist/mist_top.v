@@ -186,7 +186,6 @@ video video (
 	.clk        (clk_32        ),
   .clk27 (CLOCK_27[0]),
 	.bus_cycle  (bus_cycle     ),
-  .signal (system_ctrl[31:28]),
 	// spi for OSD
    .sdi            (SPI_DI    ),
    .sck            (SPI_SCK   ),
