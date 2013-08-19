@@ -53,6 +53,8 @@
 -- NOTE, this component uses a volume table for accurate mixing of the three analogue channels,
 -- where the outputs are wired together - like in the Atari ST
 
+-- Modified for stereo sound by Juan Carlos González Amestoy.
+
 library ieee;
   use ieee.std_logic_1164.all;
   use ieee.std_logic_arith.all;

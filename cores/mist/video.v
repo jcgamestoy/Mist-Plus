@@ -19,14 +19,16 @@
 // Examples: automation 000 + 001: bottom border
 //           automation 097: top+ bottom border
 
+//Modified by Juan Carlos González Amestoy.
+
 module video (
   // system interface
-  input           clk,     // 31.875 MHz
-  input clk27,
-  input           reset,   // reset
-  input [3:0]     bus_cycle,
+  input clk,     // 31.875 MHz
+  input clk27,   // 27.000 Mhz
+  input reset,   // reset
+  input [3:0] bus_cycle, //bus-cycle for sync
 
-  input [1:0] scanlines,
+  input [1:0] scanlines, //scanlines (00-none 01-25% 10-50% 11-100%)
   // SPI interface for OSD
   input         sck,
   input         ss,
@@ -34,8 +36,8 @@ module video (
 
   // memory interface
   output reg [22:0] vaddr,   // video word address counter
-  output          read,        // video read cycle
-  input [15:0]    data,
+  output          read,      // video read cycle
+  input [15:0]    data,      // video data read
   
   // cpu register interface
   input           reg_clk,
@@ -90,9 +92,9 @@ reg [1:0] syncmode;
 reg [1:0] syncmode_latch;
 wire pal = (syncmode_latch[1] == 1'b1);
 
-// instance of video timing module for monochrome (72hz)
+// instance of video timing module for monochrome (72hz) (31.875 Mhz Pixel clock)
 wire [9:0] vcnt_mono, hcnt_mono;
-wire hs_mono, vs_mono, hmax_mono, vmax_mono,pixel_mono,border_mono;
+wire hs_mono, vs_mono, hmax_mono, vmax_mono,pixel_mono,border_mono,pixel_clk_mono;
 timing timing_mono (
     .clk    (clk      ),
     .video_clk (clk),
@@ -109,9 +111,9 @@ timing timing_mono (
     .pixel_clk (pixel_clk_mono)
 );
 
-// instance of video timing module for pal@56Hz, 32kHz
+// instance of video timing module for pal@56Hz, (31.875 Mhz Pixel Clock)
 wire [9:0] vcnt_pal56, hcnt_pal56;
-wire hs_pal56, vs_pal56, hmax_pal56, vmax_pal56, bd_pal56,pixel_pal56,scanline_pal56;
+wire hs_pal56, vs_pal56, hmax_pal56, vmax_pal56, bd_pal56,pixel_pal56,scanline_pal56,pixel_clk_pal56;
 timing #(10'd80, 10'd40, 10'd160, 10'd100, 10'd3, 10'd66,10'd40,10'd40,10'd03) timing_pal56 (
     .clk    (clk      ),
     .video_clk (clk),
@@ -129,11 +131,9 @@ timing #(10'd80, 10'd40, 10'd160, 10'd100, 10'd3, 10'd66,10'd40,10'd40,10'd03) t
     .scanline (scanline_pal56)
 );
 
-// instance of video timing module for pal@50Hz, 32kHz
+// instance of video timing module for pal@50Hz, (27 Mhz pixel clock)
 wire [9:0] vcnt_pal50, hcnt_pal50;
-wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50,pixel_pal50,scanline_pal50;
-//timing #(10'd128, 10'd40, 10'd192, 10'd117, 10'd3, 10'd117) timing_pal50 (
-//timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88,10'd03) timing_pal50 (
+wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50,pixel_pal50,scanline_pal50,pixel_clk_pal50;
 timing #(10'd12,10'd64,10'd68,10'd93,10'd5,10'd127,10'd40,10'd88,10'd03) timing_pal50 (
     .clk    (clk      ),
     .video_clk (clk27),
@@ -151,10 +151,9 @@ timing #(10'd12,10'd64,10'd68,10'd93,10'd5,10'd127,10'd40,10'd88,10'd03) timing_
     .scanline (scanline_pal50)
 );
 
-// instance of video timing module for ntsc@60Hz, 32kHz
+// instance of video timing module for ntsc@60Hz, (27 Mhz pixel clock)
 wire [9:0] vcnt_ntsc, hcnt_ntsc;
-wire hs_ntsc, vs_ntsc, hmax_ntsc, vmax_ntsc, bd_ntsc,pixel_ntsc,scanline_ntsc;
-//timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40,10'd03) timing_ntsc (
+wire hs_ntsc, vs_ntsc, hmax_ntsc, vmax_ntsc, bd_ntsc,pixel_ntsc,scanline_ntsc,pixel_clk_ntsc;
 timing #(10'd16, 10'd62, 10'd60, 10'd49, 10'd6, 10'd70,10'd40,10'd40,10'd03) timing_ntsc (
     .clk    (clk      ),
     .video_clk (clk27),
@@ -202,14 +201,12 @@ wire scanline_color=pal?scanline_pal:scanline_ntsc;
 wire [9:0] hcnt = mono?hcnt_mono:hcnt_color;
 wire [9:0] vcnt = mono?vcnt_mono:vcnt_color;
 wire bd = mono?border_mono:bd_color;
-// monochome is 640x480 (hs & vs neg)
-// color is 800x600 (hs & vs pos)
 wire hmax = mono?hmax_mono:hmax_color;
 wire vmax = mono?vmax_mono:vmax_color;
 
 wire pixel_clk=mono?pixel_clk_mono:pixel_clk_color;
 wire pixel=mono?pixel_mono:pixel_color;
-wire scanline=mono?1'b0:scanline_color;
+wire scanline=mono?1'b0:scanline_color; //monochrome no scanlines
 
 reg [9:0] rc,wc;
 
@@ -219,8 +216,6 @@ localparam BASE_ADDR = 23'h8000;   // default video base address 0x010000
 reg [22:0] _v_bas_ad;              // video base address register
 
 // syncmode is delayed until next vsync to cope with "bottom border overscan"
-
-
 reg overscan;         // overscan detected in current frame
 reg overscan_latched;
 
@@ -326,9 +321,8 @@ wire [9:0] overscan_bottom = overscan_latched?10'd60:10'd0;
 // the color modes use a scan doubler and output the data with 2 lines delay
 wire [9:0] v_offset = mono?10'd0:10'd2; 
 wire de = (hcnt >= H_PRE) && (hcnt < H_ACT+H_PRE) && (vcnt >= v_offset && vcnt < V_ACT+v_offset+overscan_bottom);
-//wire pixel = pixelx && (vcnt >= v_offset+1 && vcnt < V_ACT+v_offset+overscan_bottom+1);
 
-reg deFake;
+reg deFake; //Fake de signal for color modes
 
 wire osd_oe,osd_pixel;
 
@@ -349,8 +343,9 @@ wire [2:0] stvid_r = mono?mono_rgb:color_r;
 wire [2:0] stvid_g = mono?mono_rgb:color_g;
 wire [2:0] stvid_b = mono?mono_rgb:color_b;
 
-wire [17:0] wPixel,rPixel;
+wire [17:0] wPixel,rPixel; //Pixel's read and write from the dual clock memory
 
+//Dual clock memory for line buffer
 dram m(
   .rClk (pixel_clk),
   .wClk (clk),
@@ -363,12 +358,14 @@ dram m(
 
 assign wPixel=!osd_oe?{stvid_r,stvid_r,stvid_g,stvid_g,stvid_b,stvid_b}:{osd_pixel,1'b1,1'b1,stvid_r,osd_pixel,osd_pixel,osd_pixel,stvid_g,osd_pixel,osd_pixel,osd_pixel,stvid_b};
 
+//Read address
 always @(posedge clk) begin
   wc<=bd?wc+10'd1:10'd0;
 end
 
+//Screen output
 always @(posedge pixel_clk) begin
-  if(!scanline || scanlines==2'b00) begin
+  if(!scanline || scanlines==2'b00) begin //if no scanlines or not a scanline
     video_r<=pixel?rPixel[17:12]:6'b000000;
     video_g<=pixel?rPixel[11:6]:6'b000000;
     video_b<=pixel?rPixel[5:0]:6'b000000;
@@ -394,12 +391,13 @@ always @(posedge pixel_clk) begin
     endcase
   end
   
-  hs <= mono?~hs_mono:((pal && pal56)?hs_color:~hs_color);
+  hs <= mono?~hs_mono:((pal && pal56)?hs_color:~hs_color); //All modes neg sync least pal 56
   vs <= mono?~vs_mono:((pal && pal56)?vs_color:~vs_color);
 
   rc<=pixel?rc+10'd1:10'd0; 
 end
 
+//Fake de signal generation
 always @(posedge clk) begin
   if(reset) begin
     deFake<=1'b0;
@@ -415,8 +413,6 @@ always @(posedge clk) begin
 end
 
 // a fake de signal for timer a for color modes with half the hsync frequency
-//wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE-10'd160) && vcnt[0])) && 
-//  (vcnt >= (v_offset) && vcnt < (V_ACT+v_offset+overscan_bottom));
 wire deC=deFake && (vcnt >= (v_offset) && vcnt < (V_ACT+v_offset+overscan_bottom));
 
 // a fake hsync pulse for the scan doubled color modes
@@ -626,25 +622,25 @@ endmodule
 // generic video timing generator
 module timing (
   input clk,     // 31.875 MHz pixel clock
-  input video_clk,
+  input video_clk, //Pixel clock frecuency
   input [3:0] bus_cycle,
   input reset,
 
-  output border,              // border (incl active area)
+  output border,              // border (incl active area) (Atari clock)
 
-  output reg [9:0] vcnt,    // vertical pixel counter
-  output reg [9:0] hcnt,    // horizontal pixel counter
+  output reg [9:0] vcnt,    // vertical pixel counter (Video clock)
+  output reg [9:0] hcnt,    // horizontal pixel counter (Atari clock)
 
-  output vs,              // vertical sync signal
-  output hs,              // horizontal sync signal
+  output vs,              // vertical sync signal (Video clock)
+  output hs,              // horizontal sync signal (Video clock)
   
-  output vmax,            // max vertical pixel position reached
+  output vmax,            // max vertical pixel position reached 
   output hmax,             // max horizontal pixel position reached
 
-  output pixel_clk,
-  output pixel,
+  output pixel_clk, //(pixel clock output)
+  output pixel, //Active when a pixel must be draw (video_clock)
 
-  output reg scanline
+  output reg scanline //Active when a scanline must be draw
 );
 
 localparam H_PRE = 10'd16;
@@ -652,7 +648,6 @@ localparam H_ACT = 10'd640;
 localparam V_ACT = 10'd400;
 
 // default: VESA 640x480x72 timing (2*40 blank lines added)
-// VESA == 31.5 MHz, Atari ST == 32 Mhz, MIST == 31.875MHz
 parameter H_FP  = 10'd24;
 parameter H_S   = 10'd40;
 parameter H_BP  = 10'd128;
@@ -663,10 +658,10 @@ parameter V_S   = 10'd3;
 parameter V_BP  = 10'd73;
 
 
-parameter H_BORDER = 10'd0;
-parameter V_BORDER = 10'd40;
+parameter H_BORDER = 10'd0; //Horizontal border
+parameter V_BORDER = 10'd40; //Vertical Border
 
-parameter V_OFFSET = 10'd1;
+parameter V_OFFSET = 10'd1; //Line Offset
 
 localparam H_TOT = H_BORDER + H_ACT + H_BORDER + H_FP + H_S + H_BP;
 localparam V_TOT = V_ACT + V_FP + V_S + V_BP;
@@ -681,14 +676,6 @@ assign vs = (vcnt >= (V_ACT+V_FP+V_OFFSET)) && (vcnt < (V_ACT+V_FP+V_S+V_OFFSET)
 // visible area to allow for counter resets etc
 assign hmax = (hcnt == H_ACT + H_BORDER + H_FP + H_PRE);
 assign vmax = (vcnt == V_ACT + V_BORDER + V_FP);
-
-
-// the following only works if H_BORDER > H_PRE
-//wire rborder = (pxc < H_ACT+H_BORDER)  && ((vcnt < V_ACT+V_BORDER+V_OFFSET)   || (vcnt >= V_TOT-V_BORDER+V_OFFSET));
-//wire lborder = (pxc >= H_TOT-H_BORDER) && ((vcnt < V_ACT+V_BORDER+V_OFFSET-1) || (vcnt >= V_TOT-V_BORDER+V_OFFSET-1));
-
-//assign border = lborder || rborder;
-//assign border = 1'd1;
 
 reg b;
 assign border=b;
@@ -725,14 +712,14 @@ always @(posedge video_clk) begin
   end
 end
 
-wire reseth=(pxc>=H_TOT-6 || pxc<6);
+wire reseth=(pxc>=H_TOT-6 || pxc<6); //Sync window between the two clocks
 
 always @(posedge clk) begin
   if(reset) begin
     hcnt<=10'd0;
     b<=1'b1;
   end else begin
-    if(reseth && bus_cycle==4'b0100) begin
+    if(reseth && bus_cycle==4'b0100) begin //b0100 is the magic value for sync
       hcnt<=10'b0-H_BORDER;
     end else begin
       if(hcnt==H_ACT+H_BORDER+H_PRE) begin
@@ -749,7 +736,6 @@ always @(posedge clk) begin
 end
 
 endmodule
-
 
 //Dual clock ram.
 module dram(

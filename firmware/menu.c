@@ -101,10 +101,10 @@ const char *helptexts[]={
 };
 
 
-const char* scanlines[]={"off","25%","50%","75%"};
+const char* scanlines[]={"Off","25%","50%","75%"};
 unsigned int scan=0;
 
-const char* stereo[]={"mono","stereo"};
+const char* stereo[]={"Mono","Stereo"};
 unsigned int sstereo=0;
 
 unsigned char config_autofire = 0;
