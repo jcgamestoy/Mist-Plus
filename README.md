@@ -1,5 +1,7 @@
 #Mist+ (A modified version of the mist-board atari core and firmware)
 
+Original code: [here](https://code.google.com/p/mist-board/)
+
 ##Features
 
 - Perfect 720x576@50hz -hs -vs 27Mhz pixel clock video signal for pal mode.
@@ -7,6 +9,7 @@
 - Scanlines (off, 25%, 50%, 75%) in color modes.
 - Pseudo stereo sound (A-B-C)
 - Modified firmware for scanlines and stereo sound selection.
+- Scroll Lock used to on / off joystick emulation.
 
 ##Instalation.
 
