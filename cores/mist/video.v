@@ -111,7 +111,7 @@ timing timing_mono (
 
 // instance of video timing module for pal@56Hz, 32kHz
 wire [9:0] vcnt_pal56, hcnt_pal56;
-wire hs_pal56, vs_pal56, hmax_pal56, vmax_pal56, bd_pal56,pixel_pal56;
+wire hs_pal56, vs_pal56, hmax_pal56, vmax_pal56, bd_pal56,pixel_pal56,scanline_pal56;
 timing #(10'd80, 10'd40, 10'd160, 10'd100, 10'd3, 10'd66,10'd40,10'd40,10'd03) timing_pal56 (
     .clk    (clk      ),
     .video_clk (clk),
@@ -125,12 +125,13 @@ timing #(10'd80, 10'd40, 10'd160, 10'd100, 10'd3, 10'd66,10'd40,10'd40,10'd03) t
     .vmax   (vmax_pal56 ),
     .hmax   (hmax_pal56 ),
     .pixel (pixel_pal56),
-    .pixel_clk (pixel_clk_pal56)
+    .pixel_clk (pixel_clk_pal56),
+    .scanline (scanline_pal56)
 );
 
 // instance of video timing module for pal@50Hz, 32kHz
 wire [9:0] vcnt_pal50, hcnt_pal50;
-wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50,pixel_pal50;
+wire hs_pal50, vs_pal50, hmax_pal50, vmax_pal50, bd_pal50,pixel_pal50,scanline_pal50;
 //timing #(10'd128, 10'd40, 10'd192, 10'd117, 10'd3, 10'd117) timing_pal50 (
 //timing #(10'd119, 10'd76, 10'd185, 10'd93, 10'd5, 10'd127, 10'd105, 10'd88,10'd03) timing_pal50 (
 timing #(10'd12,10'd64,10'd68,10'd93,10'd5,10'd127,10'd40,10'd88,10'd03) timing_pal50 (
@@ -146,12 +147,13 @@ timing #(10'd12,10'd64,10'd68,10'd93,10'd5,10'd127,10'd40,10'd88,10'd03) timing_
     .vmax   (vmax_pal50 ),
     .hmax   (hmax_pal50 ),
     .pixel (pixel_pal50),
-    .pixel_clk (pixel_clk_pal50)
+    .pixel_clk (pixel_clk_pal50),
+    .scanline (scanline_pal50)
 );
 
 // instance of video timing module for ntsc@60Hz, 32kHz
 wire [9:0] vcnt_ntsc, hcnt_ntsc;
-wire hs_ntsc, vs_ntsc, hmax_ntsc, vmax_ntsc, bd_ntsc,pixel_ntsc;
+wire hs_ntsc, vs_ntsc, hmax_ntsc, vmax_ntsc, bd_ntsc,pixel_ntsc,scanline_ntsc;
 //timing #(10'd160, 10'd40, 10'd160, 10'd64, 10'd3, 10'd64,10'd40,10'd40,10'd03) timing_ntsc (
 timing #(10'd16, 10'd62, 10'd60, 10'd49, 10'd6, 10'd70,10'd40,10'd40,10'd03) timing_ntsc (
     .clk    (clk      ),
@@ -166,7 +168,8 @@ timing #(10'd16, 10'd62, 10'd60, 10'd49, 10'd6, 10'd70,10'd40,10'd40,10'd03) tim
     .vmax   (vmax_ntsc  ),
     .hmax   (hmax_ntsc  ),
     .pixel (pixel_ntsc),
-    .pixel_clk (pixel_clk_ntsc)
+    .pixel_clk (pixel_clk_ntsc),
+    .scanline (scanline_ntsc)
 );
 
 // ----------- de-multiplex video timing signals ------------
@@ -181,6 +184,7 @@ wire hmax_pal = pal56?hmax_pal56:hmax_pal50;
 wire vmax_pal = pal56?vmax_pal56:vmax_pal50;
 wire pixel_pal=pal56?pixel_pal56:pixel_pal50;
 wire pixel_clk_pal=pal56?pixel_clk_pal56:pixel_clk_pal50;
+wire scanline_pal = pal56?scanline_pal56:scanline_pal50;
 
 // de-multiplex pal(50hz/56hz)/ntsc(60hz) timing
 wire [9:0] hcnt_color = pal?hcnt_pal:hcnt_ntsc;
@@ -192,6 +196,7 @@ wire hmax_color = pal?hmax_pal:hmax_ntsc;
 wire vmax_color = pal?vmax_pal:vmax_ntsc;
 wire pixel_color=pal?pixel_pal:pixel_ntsc;
 wire pixel_clk_color=pal?pixel_clk_pal:pixel_clk_ntsc;
+wire scanline_color=pal?scanline_pal:scanline_ntsc;
 
 // de-multiplex mono(72hz)/color(50hz/56hz/60hz) timing
 wire [9:0] hcnt = mono?hcnt_mono:hcnt_color;
@@ -204,17 +209,14 @@ wire vmax = mono?vmax_mono:vmax_color;
 
 wire pixel_clk=mono?pixel_clk_mono:pixel_clk_color;
 wire pixel=mono?pixel_mono:pixel_color;
+wire scanline=mono?1'b0:scanline_color;
 
 reg [9:0] rc,wc;
-
-
 
 reg [15:0] tx, tx0, tx1, tx2, tx3;      // output shift registers
 
 localparam BASE_ADDR = 23'h8000;   // default video base address 0x010000
 reg [22:0] _v_bas_ad;              // video base address register
-
-
 
 // syncmode is delayed until next vsync to cope with "bottom border overscan"
 
@@ -366,7 +368,7 @@ always @(posedge clk) begin
 end
 
 always @(posedge pixel_clk) begin
-  if(!vcnt[0] || scanlines==2'b00 || mono) begin
+  if(!scanline || scanlines==2'b00) begin
     video_r<=pixel?rPixel[17:12]:6'b000000;
     video_g<=pixel?rPixel[11:6]:6'b000000;
     video_b<=pixel?rPixel[5:0]:6'b000000;
@@ -640,7 +642,9 @@ module timing (
   output hmax,             // max horizontal pixel position reached
 
   output pixel_clk,
-  output pixel
+  output pixel,
+
+  output reg scanline
 );
 
 localparam H_PRE = 10'd16;
@@ -700,6 +704,7 @@ always @(posedge video_clk) begin
     // run synchronous to bus state machine
     pxc <= 10'd0;
     vcnt <= 10'd0;
+    scanline <= 1'b0;
   end else begin
     // horizontal video counter
     if(pxc < H_TOT - 10'd1)
@@ -707,10 +712,14 @@ always @(posedge video_clk) begin
     else begin
       pxc <= 10'd0;
       // vertical video counter
-      if(vcnt < V_TOT - 10'd1)
+      if(vcnt < V_TOT - 10'd1) begin
         vcnt <= vcnt + 10'd1;
-      else begin
+        if(vcnt<V_ACT+V_BORDER || vcnt>=V_TOT-V_BORDER) begin
+          scanline<=scanline+1'b1;
+        end
+      end else begin
         vcnt <= 10'd0;
+        scanline<= 1'b0;
       end
     end
   end
