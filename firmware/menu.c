@@ -104,6 +104,9 @@ const char *helptexts[]={
 const char* scanlines[]={"off","25%","50%","75%"};
 unsigned int scan=0;
 
+const char* stereo[]={"mono","stereo"};
+unsigned int sstereo=0;
+
 unsigned char config_autofire = 0;
 
 // file selection menu variables
@@ -319,7 +322,7 @@ void HandleUI(void)
 	/* everything else is in submenus */
         OsdWrite(3, " Storage                   \x16", menusub == 2,0);
         OsdWrite(4, " System                    \x16", menusub == 3,0);
-        OsdWrite(5, " Video                     \x16", menusub == 4,0);
+        OsdWrite(5, " Audio / Video             \x16", menusub == 4,0);
         OsdWrite(6, " Firmware & Core           \x16", menusub == 5,0);
 
         OsdWrite(7, STD_EXIT, menusub == 6,0);
@@ -563,8 +566,8 @@ void HandleUI(void)
 
 
     case MENU_MIST_VIDEO1 :
-	menumask=0x0f;
-	OsdSetTitle("Video", 0);
+	menumask=0x1f;
+	OsdSetTitle("A/V", 0);
 
         OsdWrite(0, "", 0,0);
 
@@ -587,9 +590,11 @@ void HandleUI(void)
   strcpy(s," Scanlines: ");
   strcat(s,scanlines[scan & 0x3]);
   OsdWrite(4,s,menusub==2,0);
-  OsdWrite(5, "", 0,0);
+  strcpy(s," Audio: ");
+  strcat(s,stereo[sstereo & 0x1]);
+  OsdWrite(5, s, menusub==3,0);
   OsdWrite(6, "", 0,0);
-  OsdWrite(7, STD_EXIT, menusub == 3,0);
+  OsdWrite(7, STD_EXIT, menusub == 4,0);
 
 	parentstate = menustate;
         menustate = MENU_MIST_VIDEO2;
@@ -614,10 +619,15 @@ void HandleUI(void)
 
   case 2:
     scan=(scan+1) & 0x3;
-    tos_update_sysctrl((tos_system_ctrl & 0x8ffffff) | (scan<<30));
+    tos_update_sysctrl((tos_system_ctrl & 0x3fffffff) | (scan<<30));
     menustate=MENU_MIST_VIDEO1;
     break;
-	case 3:
+  case 3:
+    sstereo++;
+    tos_update_sysctrl(tos_system_ctrl ^ 0x20000000);
+    menustate=MENU_MIST_VIDEO1;
+    break;
+	case 4:
 	  menustate = MENU_MIST_MAIN1;
 	  menusub = 4;
 	}
